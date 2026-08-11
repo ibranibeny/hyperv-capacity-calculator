@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Kalkulator kapasitas VM untuk cluster Hyper-V HCI empat node.">
+  <title>Hyper-V Capacity Console</title>
+  <script>
+    (() => {
+      const param = new URLSearchParams(window.location.search).get("scoutTheme");
+      const theme =
+        param || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      document.documentElement.setAttribute("data-theme", theme);
+    })();
+  </script>
+  <style>
+:root {
+  color-scheme: light;
+  --cp-bg: #f7f4ef;
+  --cp-bg-elevated: #fcfbf8;
+  --cp-surface: #ffffff;
+  --cp-surface-soft: #f5f5f5;
+  --cp-border: #dedede;
+  --cp-border-strong: #919191;
+  --cp-text: #242424;
+  --cp-text-muted: #5c5c5c;
+  --cp-text-soft: #6f6f6f;
+  --cp-accent: #b11f4b;
+  --cp-accent-hover: #9a1a41;
+  --cp-accent-soft: rgba(177, 31, 75, 0.08);
+  --cp-accent-fg: #ffffff;
+  --cp-success: #16a34a;
+  --cp-danger: #dc2626;
+  --cp-warning: #f59e0b;
+  --cp-link: #0078d4;
+  --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.12);
+  --cp-overlay: rgba(255, 255, 255, 0.8);
+  --cp-panel: rgba(255, 255, 255, 0.86);
+  --cp-panel-strong: rgba(255, 255, 255, 0.96);
+  --cp-sheen: rgba(255, 255, 255, 0.55);
+  --cp-highlight: rgba(177, 31, 75, 0.12);
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --cp-bg: #3d3b3a;
+  --cp-bg-elevated: #343231;
+  --cp-surface: #292929;
+  --cp-surface-soft: #2e2e2e;
+  --cp-border: #474747;
+  --cp-border-strong: #5f5f5f;
+  --cp-text: #dedede;
+  --cp-text-muted: #919191;
+  --cp-text-soft: #b0b0b0;
+  --cp-accent: #fd8ea1;
+  --cp-accent-hover: #fb7b91;
+  --cp-accent-soft: rgba(253, 142, 161, 0.14);
+  --cp-accent-fg: #1a1a1a;
+  --cp-success: #4ade80;
+  --cp-danger: #f87171;
+  --cp-warning: #fbbf24;
+  --cp-link: #4da6ff;
+  --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+  --cp-overlay: rgba(41, 41, 41, 0.88);
+  --cp-panel: rgba(41, 41, 41, 0.72);
+  --cp-panel-strong: rgba(41, 41, 41, 0.96);
+  --cp-sheen: rgba(255, 255, 255, 0.04);
+  --cp-highlight: rgba(253, 142, 161, 0.12);
+}
+
+* { box-sizing: border-box; }
+
+html { min-width: 320px; overflow-x: hidden; scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background-color: var(--cp-bg);
+  background-image: repeating-linear-gradient(90deg, var(--cp-bg) 0, var(--cp-bg) 31px, var(--cp-bg-elevated) 32px);
+  color: var(--cp-text);
+  font-family: "Segoe UI", Aptos, Calibri, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  letter-spacing: 0;
+}
+
+button, input, select { font: inherit; letter-spacing: 0; }
+button, select, input[type="checkbox"] { cursor: pointer; }
+a { color: var(--cp-link); }
+
+:focus-visible {
+  outline: 3px solid var(--cp-accent);
+  outline-offset: 3px;
+}
+
+.skip-link {
+  position: fixed;
+  z-index: 20;
+  left: 16px;
+  top: 12px;
+  padding: 8px 12px;
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border-strong);
+  transform: translateY(-160%);
+}
+
+.skip-link:focus { transform: translateY(0); }
+
+.topbar {
+  min-height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 16px clamp(20px, 4vw, 64px);
+  border-bottom: 1px solid var(--cp-border);
+  background: var(--cp-panel-strong);
+}
+
+.brand-lockup, .header-actions, .section-heading, .result-summary, .meter-head, .node-head {
+  display: flex;
+  align-items: center;
+}
+
+.brand-lockup { gap: 12px; }
+.brand-mark {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--cp-accent);
+  color: var(--cp-accent);
+  font-family: Consolas, "Courier New", Courier, monospace;
+  font-weight: 700;
+}
+
+h1, h2, p { margin-top: 0; }
+h1 { margin-bottom: 0; font-size: clamp(19px, 2vw, 27px); line-height: 1.1; }
+h2 { margin-bottom: 0; font-size: 20px; line-height: 1.25; }
+.utility-label {
+  margin-bottom: 3px;
+  color: var(--cp-text-muted);
+  font-family: Consolas, "Courier New", Courier, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.header-actions { flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.button {
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid var(--cp-border-strong);
+  border-radius: 6px;
+  background: var(--cp-surface);
+  color: var(--cp-text);
+  font-weight: 650;
+}
+.button:hover { border-color: var(--cp-accent); }
+.button.primary { background: var(--cp-accent); border-color: var(--cp-accent); color: var(--cp-accent-fg); }
+.button.primary:hover { background: var(--cp-accent-hover); }
+.button.ghost { background: transparent; border-color: var(--cp-border); }
+
+.disclaimer-band {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 11px clamp(20px, 4vw, 64px);
+  border-bottom: 1px solid var(--cp-warning);
+  background: var(--cp-surface-soft);
+  color: var(--cp-text-muted);
+  font-size: 13px;
+}
+
+.disclaimer-band strong {
+  flex: 0 0 auto;
+  color: var(--cp-text);
+}
+
+main { width: min(1500px, 100%); margin: 0 auto; }
+main > section, .workspace-grid { padding-left: clamp(20px, 4vw, 64px); padding-right: clamp(20px, 4vw, 64px); }
+
+.cluster-intro { padding-top: 34px; padding-bottom: 32px; }
+.section-heading { justify-content: space-between; gap: 24px; margin-bottom: 18px; }
+.section-heading.compact { margin-bottom: 16px; }
+.section-note { max-width: 460px; margin-bottom: 0; color: var(--cp-text-muted); text-align: right; }
+
+.node-rail { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.node-card {
+  min-height: 134px;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  border: 1px solid var(--cp-border-strong);
+  border-top: 5px solid var(--cp-accent);
+  border-radius: 6px;
+  background: var(--cp-surface);
+  box-shadow: 0 0 2px var(--cp-border), 0 1px 2px var(--cp-border);
+}
+.node-head { justify-content: space-between; gap: 8px; margin-bottom: 15px; font-family: Consolas, "Courier New", Courier, monospace; font-size: 12px; font-weight: 700; }
+.node-card > span { color: var(--cp-text-muted); font-size: 13px; }
+.node-card.is-reserve { border-style: dashed; border-top-color: var(--cp-warning); background: var(--cp-surface-soft); }
+.node-card.is-reserve > strong, .node-card.is-reserve > span:not(.node-state) { opacity: .55; }
+.node-state { color: var(--cp-success); }
+.node-card.is-reserve .node-state { color: var(--cp-warning); }
+
+.raw-facts { display: grid; grid-template-columns: repeat(4, 1fr); margin: 12px 0 0; border: 1px solid var(--cp-border); background: var(--cp-bg-elevated); }
+.raw-facts > div { padding: 12px 16px; border-right: 1px solid var(--cp-border); }
+.raw-facts > div:last-child { border-right: 0; }
+.raw-facts dt { color: var(--cp-text-muted); font-size: 12px; }
+.raw-facts dd { margin: 2px 0 0; font-family: Consolas, "Courier New", Courier, monospace; font-weight: 700; }
+
+.workspace-grid { display: grid; grid-template-columns: minmax(270px, .7fr) minmax(650px, 2fr); gap: 0; padding-bottom: 36px; }
+.policy-panel, .workload-panel { min-width: 0; padding-top: 24px; padding-bottom: 24px; border-top: 1px solid var(--cp-border-strong); border-bottom: 1px solid var(--cp-border-strong); }
+.policy-panel { padding-right: 28px; }
+.workload-panel { padding-left: 28px; border-left: 1px solid var(--cp-border); }
+
+.field, .toggle-field { display: grid; gap: 6px; margin-bottom: 14px; color: var(--cp-text-muted); font-size: 12px; font-weight: 650; }
+.field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+input, select {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--cp-border-strong);
+  border-radius: 4px;
+  background: var(--cp-surface);
+  color: var(--cp-text);
+}
+.input-unit { display: grid; grid-template-columns: 1fr auto; align-items: center; }
+.input-unit input { border-radius: 4px 0 0 4px; }
+.input-unit span { min-height: 40px; display: grid; place-items: center; padding: 0 9px; border: 1px solid var(--cp-border-strong); border-left: 0; border-radius: 0 4px 4px 0; background: var(--cp-surface-soft); }
+.toggle-field { grid-template-columns: 1fr auto; align-items: center; padding: 11px 0; border-top: 1px solid var(--cp-border); border-bottom: 1px solid var(--cp-border); color: var(--cp-text); }
+.toggle-field small { display: block; color: var(--cp-text-muted); font-weight: 400; }
+.toggle-field input { width: 22px; min-height: 22px; accent-color: var(--cp-accent); }
+.assumption-callout { margin-top: 8px; padding: 12px; border-left: 4px solid var(--cp-warning); background: var(--cp-surface-soft); }
+.assumption-callout p { margin: 4px 0 0; color: var(--cp-text-muted); font-size: 13px; }
+
+.table-scroll { width: 100%; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 10px 8px; border-bottom: 1px solid var(--cp-border); text-align: left; vertical-align: middle; }
+thead th { color: var(--cp-text-muted); font-size: 11px; text-transform: uppercase; white-space: nowrap; }
+.workload-table { min-width: 780px; }
+.workload-table input { min-width: 76px; min-height: 36px; padding: 6px 8px; }
+.workload-table input[data-field="name"] { min-width: 130px; }
+.workload-table tfoot { background: var(--cp-surface-soft); font-family: Consolas, "Courier New", Courier, monospace; font-size: 12px; }
+.remove-row { min-height: 36px; padding: 5px 9px; border: 1px solid var(--cp-border); border-radius: 4px; background: transparent; color: var(--cp-danger); }
+.remove-row:hover { border-color: var(--cp-danger); }
+.table-help { margin: 12px 0 0; color: var(--cp-text-muted); font-size: 13px; }
+
+.result-band { padding-top: 30px; padding-bottom: 30px; background: var(--cp-surface); border-top: 1px solid var(--cp-border); border-bottom: 1px solid var(--cp-border); }
+.result-summary { justify-content: space-between; gap: 20px; margin-bottom: 20px; }
+.status-badge { min-width: 122px; padding: 8px 12px; border: 1px solid var(--cp-success); border-radius: 999px; color: var(--cp-success); font-family: Consolas, "Courier New", Courier, monospace; font-weight: 700; text-align: center; }
+.status-badge.watch { border-color: var(--cp-warning); color: var(--cp-warning); }
+.status-badge.over-capacity { border-color: var(--cp-danger); color: var(--cp-danger); }
+.meters { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.meter { min-width: 0; padding-top: 12px; border-top: 4px solid var(--cp-border-strong); }
+.meter.is-limiting { border-top-color: var(--cp-accent); }
+.meter-head { justify-content: space-between; gap: 12px; }
+.meter-head strong { font-family: Consolas, "Courier New", Courier, monospace; font-size: 24px; }
+.meter progress { width: 100%; height: 10px; accent-color: var(--cp-success); }
+.meter.watch progress { accent-color: var(--cp-warning); }
+.meter.over-capacity progress { accent-color: var(--cp-danger); }
+.meter p { margin: 7px 0 0; color: var(--cp-text-muted); font-size: 13px; }
+.limiting-line { margin: 20px 0 0; }
+
+.ledger-section { padding-top: 34px; padding-bottom: 34px; }
+.ledger { min-width: 720px; border-top: 1px solid var(--cp-border-strong); }
+.ledger th[scope="row"] { width: 22%; }
+.ledger .safe-row { background: var(--cp-accent-soft); font-weight: 700; }
+
+.guidance-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; padding-top: 0; padding-bottom: 34px; }
+.guidance-block { padding: 24px 28px 24px 0; border-top: 1px solid var(--cp-border-strong); }
+.guidance-block + .guidance-block { padding-left: 28px; padding-right: 0; border-left: 1px solid var(--cp-border); }
+.guidance-block ul { margin: 14px 0 0; padding-left: 20px; color: var(--cp-text-muted); }
+.guidance-block li + li { margin-top: 7px; }
+.warning-block { border-top-color: var(--cp-warning); }
+
+.sources { padding: 24px clamp(20px, 4vw, 64px) 42px; border-top: 1px solid var(--cp-border); color: var(--cp-text-muted); font-size: 13px; }
+.sources p { margin-bottom: 10px; }
+.sources nav { display: flex; flex-wrap: wrap; gap: 8px 20px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+@media (max-width: 1000px) {
+  .workspace-grid { grid-template-columns: 1fr; }
+  .policy-panel { padding-right: 0; }
+  .workload-panel { padding-left: 0; border-left: 0; border-top: 0; }
+  .node-rail { grid-template-columns: 1fr 1fr; }
+  .raw-facts { grid-template-columns: 1fr 1fr; }
+  .raw-facts > div:nth-child(2) { border-right: 0; }
+  .raw-facts > div:nth-child(-n+2) { border-bottom: 1px solid var(--cp-border); }
+}
+
+@media (max-width: 760px) {
+  .topbar { align-items: flex-start; flex-direction: column; }
+  .header-actions { width: 100%; justify-content: flex-start; }
+  .header-actions .button { flex: 1 1 auto; }
+  .section-heading { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .section-note { text-align: left; }
+  .meters, .guidance-grid { grid-template-columns: 1fr; }
+  .guidance-block + .guidance-block { padding-left: 0; border-left: 0; }
+  .node-card { min-height: 124px; }
+}
+
+@media (max-width: 520px) {
+  .node-rail, .raw-facts, .field-pair { grid-template-columns: 1fr; }
+  .raw-facts > div { border-right: 0; border-bottom: 1px solid var(--cp-border); }
+  .raw-facts > div:last-child { border-bottom: 0; }
+  .result-summary { align-items: flex-start; flex-direction: column; }
+  .status-badge { width: 100%; }
+  .disclaimer-band { align-items: flex-start; flex-direction: column; gap: 2px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+}
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#workloads">Lewati ke workload VM</a>
+  <header class="topbar">
+    <div class="brand-lockup">
+      <span class="brand-mark" aria-hidden="true">HV</span>
+      <div>
+        <p class="utility-label">Windows Server HCI</p>
+        <h1>Hyper-V Capacity Console</h1>
+      </div>
+    </div>
+    <div class="header-actions" aria-label="Tindakan kalkulator">
+      <button class="button secondary" id="load-sample" type="button">Load sample</button>
+      <button class="button secondary" id="export-snapshot" type="button">Export JSON</button>
+      <button class="button secondary" id="export-csv" type="button">Export CSV</button>
+      <button class="button primary" id="export-xlsx" type="button">Export XLSX</button>
+      <button class="button ghost" id="reset-calculator" type="button">Reset</button>
+    </div>
+  </header>
+
+  <aside class="disclaimer-band" id="unofficial-disclaimer" role="note" aria-label="Disclaimer">
+    <strong>Alat ini tidak resmi dari Microsoft.</strong>
+    <span>Hasil adalah estimasi berbasis asumsi dan input pengguna. Bukan rekomendasi, validasi, atau persetujuan sizing dari Microsoft. Verifikasi dengan data workload aktual, Microsoft, dan vendor/OEM sebelum keputusan produksi.</span>
+  </aside>
+
+  <main>
+    <section class="cluster-intro" aria-labelledby="cluster-heading">
+      <div class="section-heading">
+        <div>
+          <p class="utility-label">Cluster baseline / fixed hardware</p>
+          <h2 id="cluster-heading">Four-node compute and storage rail</h2>
+        </div>
+        <p class="section-note">M.2 480 GB = boot RAID1, tidak masuk pool S2D.</p>
+      </div>
+
+      <div class="node-rail" id="node-rail" aria-label="Empat node Hyper-V">
+        <article class="node-card" data-node-index="1">
+          <div class="node-head"><span>NODE 01</span><span class="node-state">Active</span></div>
+          <strong>32 cores</strong><span>512 GB RAM</span><span>7 x 1.92 TB NVMe</span>
+        </article>
+        <article class="node-card" data-node-index="2">
+          <div class="node-head"><span>NODE 02</span><span class="node-state">Active</span></div>
+          <strong>32 cores</strong><span>512 GB RAM</span><span>7 x 1.92 TB NVMe</span>
+        </article>
+        <article class="node-card" data-node-index="3">
+          <div class="node-head"><span>NODE 03</span><span class="node-state">Active</span></div>
+          <strong>32 cores</strong><span>512 GB RAM</span><span>7 x 1.92 TB NVMe</span>
+        </article>
+        <article class="node-card" data-node-index="4">
+          <div class="node-head"><span>NODE 04</span><span class="node-state">Active</span></div>
+          <strong>32 cores</strong><span>512 GB RAM</span><span>7 x 1.92 TB NVMe</span>
+        </article>
+      </div>
+
+      <dl class="raw-facts" aria-label="Raw cluster totals">
+        <div><dt>Physical cores</dt><dd id="raw-cores">128</dd></div>
+        <div><dt>Raw RAM</dt><dd id="raw-ram">2,048 GB</dd></div>
+        <div><dt>Raw storage</dt><dd id="raw-storage">53.76 TB</dd></div>
+        <div><dt>Network / node</dt><dd id="raw-network">4 x 25 GbE</dd></div>
+      </dl>
+    </section>
+
+    <div class="workspace-grid">
+      <aside class="policy-panel" aria-labelledby="policy-heading">
+        <div class="section-heading compact">
+          <div><p class="utility-label">Editable policy assumptions</p><h2 id="policy-heading">Capacity policy</h2></div>
+        </div>
+        <form id="policy-form">
+          <label class="field">
+            <span>Storage resiliency</span>
+            <select id="resiliency" name="resiliency">
+              <option value="three-way-mirror">Three-way mirror</option>
+              <option value="dual-parity">Dual parity (comparison)</option>
+            </select>
+          </label>
+
+          <label class="toggle-field">
+            <span><strong>N+1 compute</strong><small>Satu node tidak dihitung untuk VM.</small></span>
+            <input id="n-plus-one" name="nPlusOne" type="checkbox" checked>
+          </label>
+
+          <div class="field-pair">
+            <label class="field"><span>vCPU : core</span><input id="cpu-ratio" name="cpuOvercommitRatio" type="number" min="0.1" max="16" step="0.1" value="2"></label>
+            <label class="field"><span>CPU ceiling %</span><input id="cpu-utilization" name="cpuUtilizationPercent" type="number" min="1" max="100" step="1" value="80"></label>
+          </div>
+          <div class="field-pair">
+            <label class="field"><span>Host RAM reserve</span><div class="input-unit"><input id="host-memory-reserve" name="hostMemoryReserveGb" type="number" min="0" max="511" step="1" value="32"><span>GB</span></div></label>
+            <label class="field"><span>RAM ceiling %</span><input id="memory-utilization" name="memoryUtilizationPercent" type="number" min="1" max="100" step="1" value="80"></label>
+          </div>
+          <div class="field-pair">
+            <label class="field"><span>Storage headroom %</span><input id="storage-headroom" name="storageHeadroomPercent" type="number" min="0" max="90" step="1" value="20"></label>
+            <label class="field"><span>Planning horizon</span><div class="input-unit"><input id="planning-years" name="planningYears" type="number" min="0" max="10" step="1" value="1"><span>years</span></div></label>
+          </div>
+        </form>
+        <div class="assumption-callout">
+          <strong>Jujur tentang default</strong>
+          <p>Rasio CPU, reserve RAM, dan ceiling 80% adalah kebijakan awal yang editable, bukan batas resmi Microsoft.</p>
+        </div>
+      </aside>
+
+      <section class="workload-panel" id="workloads" aria-labelledby="workload-heading">
+        <div class="section-heading compact">
+          <div><p class="utility-label">Demand model</p><h2 id="workload-heading">VM workload mix</h2></div>
+          <button class="button primary" id="add-workload" type="button">Add workload</button>
+        </div>
+        <div class="table-scroll">
+          <table class="workload-table">
+            <thead><tr><th scope="col">Workload</th><th scope="col">Qty</th><th scope="col">vCPU / VM</th><th scope="col">RAM GB / VM</th><th scope="col">Disk GB / VM</th><th scope="col">Growth / yr</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+            <tbody id="workload-body"></tbody>
+            <tfoot><tr><th scope="row">Projected demand</th><td id="total-vms">0 VMs</td><td id="total-vcpu">0 vCPU</td><td id="total-demand-ram">0 GB</td><td id="total-demand-storage">0 TB</td><td colspan="2" id="growth-horizon">at year 1</td></tr></tfoot>
+          </table>
+        </div>
+        <p class="table-help">RAM adalah planned allocation. Dynamic Memory tidak dihitung sebagai kapasitas yang dijamin.</p>
+      </section>
+    </div>
+
+    <section class="result-band" aria-labelledby="result-heading">
+      <div class="result-summary">
+        <div>
+          <p class="utility-label">N+1 safe capacity / policy-adjusted</p>
+          <h2 id="result-heading">Scenario result</h2>
+        </div>
+        <div class="status-badge" id="scenario-status" role="status" aria-live="polite">Fits</div>
+      </div>
+      <div class="meters" id="capacity-meters">
+        <article class="meter" data-resource="cpu">
+          <div class="meter-head"><span>vCPU</span><strong id="cpu-percent">0%</strong></div>
+          <progress id="cpu-progress" max="100" value="0">0%</progress>
+          <p><span id="cpu-demand">0</span> of <span id="cpu-capacity">153.6</span> policy vCPU</p>
+        </article>
+        <article class="meter" data-resource="memory">
+          <div class="meter-head"><span>RAM</span><strong id="memory-percent">0%</strong></div>
+          <progress id="memory-progress" max="100" value="0">0%</progress>
+          <p><span id="memory-demand">0 GB</span> of <span id="memory-capacity">1,152 GB</span></p>
+        </article>
+        <article class="meter" data-resource="storage">
+          <div class="meter-head"><span>Storage</span><strong id="storage-percent">0%</strong></div>
+          <progress id="storage-progress" max="100" value="0">0%</progress>
+          <p><span id="storage-demand">0 TB</span> of <span id="storage-capacity">12.29 TB</span></p>
+        </article>
+      </div>
+      <p class="limiting-line">Limiting resource: <strong id="limiting-resource">None</strong></p>
+    </section>
+
+    <section class="ledger-section" aria-labelledby="ledger-heading">
+      <div class="section-heading">
+        <div><p class="utility-label">Evidence ledger</p><h2 id="ledger-heading">From installed hardware to safe capacity</h2></div>
+        <p class="section-note">Storage uses decimal TB; Windows reports binary TiB.</p>
+      </div>
+      <div class="table-scroll">
+        <table class="ledger" id="capacity-ledger">
+          <thead><tr><th scope="col">Layer</th><th scope="col">CPU</th><th scope="col">RAM</th><th scope="col">Storage</th><th scope="col">Basis</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Raw cluster</th><td>128 cores</td><td>2,048 GB</td><td id="ledger-raw-storage">53.76 TB</td><td>Installed hardware</td></tr>
+            <tr><th scope="row">N+1 compute</th><td id="ledger-n1-cores">96 cores</td><td id="ledger-n1-ram">1,536 GB</td><td>Not applicable</td><td>One node unavailable</td></tr>
+            <tr><th scope="row">Drive repair reserve</th><td>Not applicable</td><td>Not applicable</td><td id="ledger-reserve">-7.68 TB</td><td>1 drive / node, max 4</td></tr>
+            <tr><th scope="row" id="ledger-resiliency-label">Three-way mirror</th><td id="ledger-safe-vcpu">153.6 vCPU</td><td id="ledger-safe-ram">1,152 GB</td><td id="ledger-usable-storage">15.36 TB usable</td><td id="ledger-efficiency">33.3% efficiency</td></tr>
+            <tr class="safe-row"><th scope="row">Policy-safe ceiling</th><td id="ledger-policy-vcpu">153.6 vCPU</td><td id="ledger-policy-ram">1,152 GB</td><td id="ledger-safe-storage">12.29 TB</td><td>After editable headroom</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="guidance-grid" aria-label="Best practices and limits">
+      <div class="guidance-block">
+        <p class="utility-label">Verified guidance</p>
+        <h2>Production baseline</h2>
+        <ul>
+          <li>Use ReFS CSV volumes for performance-sensitive Hyper-V VMs.</li>
+          <li>Keep four-drive equivalent reserve for immediate in-place repair.</li>
+          <li>For four-node S2D, use RDMA-capable 25 GbE or faster with redundant links.</li>
+          <li>Use SET, QoS, VLAN isolation, SMB Multichannel, and validate the full cluster.</li>
+          <li>Choose validated hardware; align server, NIC, driver, and firmware versions.</li>
+        </ul>
+      </div>
+      <div class="guidance-block warning-block">
+        <p class="utility-label">Not assessed</p>
+        <h2>Measure before approval</h2>
+        <ul id="unassessed-list">
+          <li>NVMe IOPS, latency, endurance, and power-loss protection.</li>
+          <li>NUMA boundaries, CPU generation, hyper-threading, and peak CPU behavior.</li>
+          <li>Switch fabric, RDMA mode, DCB/PFC for RoCE, and network oversubscription.</li>
+          <li>Backup, checkpoints, replicas, disaster recovery, licensing, and growth outside VM disks.</li>
+        </ul>
+      </div>
+    </section>
+
+    <footer class="sources">
+      <p><strong>Sources checked 11 Aug 2026.</strong> Microsoft Learn digunakan sebagai referensi teknis dan tidak menyiratkan dukungan atau endorsement atas alat ini; WebIQ hanya digunakan untuk secondary discovery.</p>
+      <nav aria-label="Sources">
+        <a href="https://learn.microsoft.com/windows-server/storage/storage-spaces/plan-volumes" target="_blank" rel="noopener noreferrer">Plan S2D volumes</a>
+        <a href="https://learn.microsoft.com/windows-server/storage/storage-spaces/storage-spaces-direct-hardware-requirements" target="_blank" rel="noopener noreferrer">S2D hardware requirements</a>
+        <a href="https://learn.microsoft.com/windows-server/virtualization/hyper-v/failover-cluster-network-recommendations" target="_blank" rel="noopener noreferrer">Cluster networking</a>
+        <a href="https://learn.microsoft.com/windows-server/virtualization/hyper-v/dynamic-memory" target="_blank" rel="noopener noreferrer">Dynamic Memory</a>
+      </nav>
+    </footer>
+  </main>
+
+  <script>
+(function attachCapacityEngine(globalScope, factory) {
+  const api = factory();
+
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = api;
+  }
+
+  globalScope.HyperVCapacity = api;
+}(typeof globalThis !== 'undefined' ? globalThis : this, function createCapacityEngine() {
+  'use strict';
+
+  const DEFAULT_CLUSTER = Object.freeze({
+    nodeCount: 4,
+    socketsPerNode: 2,
+    coresPerSocket: 16,
+    clockGhz: 3.2,
+    dimmsPerNode: 16,
+    gbPerDimm: 32,
+    capacityDrivesPerNode: 7,
+    capacityDriveTb: 1.92,
+    bootDrivesPerNode: 2,
+    bootDriveGb: 480,
+    bootCapacityIncluded: false,
+    networkAdaptersPerNode: 2,
+    portsPerAdapter: 2,
+    networkSpeedGbps: 25,
+  });
+
+  const DEFAULT_POLICY = Object.freeze({
+    nPlusOne: true,
+    resiliency: 'three-way-mirror',
+    cpuOvercommitRatio: 2,
+    cpuUtilizationPercent: 80,
+    hostMemoryReserveGb: 32,
+    memoryUtilizationPercent: 80,
+    storageHeadroomPercent: 20,
+    planningYears: 1,
+  });
+
+  const TB_TO_TIB = (1000 ** 4) / (1024 ** 4);
+
+  function numberAtLeast(value, minimum, fallback = minimum) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.max(minimum, parsed) : fallback;
+  }
+
+  function percentage(value, fallback) {
+    return Math.min(100, numberAtLeast(value, 0, fallback));
+  }
+
+  function calculateHardware(cluster = DEFAULT_CLUSTER) {
+    const nodeCount = numberAtLeast(cluster.nodeCount, 1, DEFAULT_CLUSTER.nodeCount);
+    const coresPerNode = numberAtLeast(cluster.socketsPerNode, 1, DEFAULT_CLUSTER.socketsPerNode)
+      * numberAtLeast(cluster.coresPerSocket, 1, DEFAULT_CLUSTER.coresPerSocket);
+    const ramPerNodeGb = numberAtLeast(cluster.dimmsPerNode, 1, DEFAULT_CLUSTER.dimmsPerNode)
+      * numberAtLeast(cluster.gbPerDimm, 1, DEFAULT_CLUSTER.gbPerDimm);
+    const capacityDrivesPerNode = numberAtLeast(
+      cluster.capacityDrivesPerNode,
+      1,
+      DEFAULT_CLUSTER.capacityDrivesPerNode,
+    );
+    const capacityDriveTb = numberAtLeast(
+      cluster.capacityDriveTb,
+      0.001,
+      DEFAULT_CLUSTER.capacityDriveTb,
+    );
+    const totalPhysicalCores = nodeCount * coresPerNode;
+    const rawStorageTb = nodeCount * capacityDrivesPerNode * capacityDriveTb;
+
+    return {
+      nodeCount,
+      coresPerNode,
+      totalPhysicalCores,
+      clockGhz: numberAtLeast(cluster.clockGhz, 0, DEFAULT_CLUSTER.clockGhz),
+      nominalComputeGhz: totalPhysicalCores
+        * numberAtLeast(cluster.clockGhz, 0, DEFAULT_CLUSTER.clockGhz),
+      ramPerNodeGb,
+      totalRamGb: nodeCount * ramPerNodeGb,
+      capacityDrivesPerNode,
+      capacityDriveTb,
+      rawStorageTb,
+      bootDrivesPerNode: numberAtLeast(cluster.bootDrivesPerNode, 0, 0),
+      bootDriveGb: numberAtLeast(cluster.bootDriveGb, 0, 0),
+      bootCapacityIncluded: Boolean(cluster.bootCapacityIncluded),
+      networkPortsPerNode: numberAtLeast(cluster.networkAdaptersPerNode, 0, 0)
+        * numberAtLeast(cluster.portsPerAdapter, 0, 0),
+      networkSpeedGbps: numberAtLeast(cluster.networkSpeedGbps, 0, 0),
+    };
+  }
+
+  function calculateStorage(hardware, policy = DEFAULT_POLICY) {
+    const reserveDriveCount = Math.min(hardware.nodeCount, 4);
+    const reserveTb = reserveDriveCount * hardware.capacityDriveTb;
+    const allocatablePoolTb = Math.max(0, hardware.rawStorageTb - reserveTb);
+    const efficiency = policy.resiliency === 'dual-parity' ? 0.5 : 1 / 3;
+    const usableTb = allocatablePoolTb * efficiency;
+    const storageHeadroomPercent = percentage(
+      policy.storageHeadroomPercent,
+      DEFAULT_POLICY.storageHeadroomPercent,
+    );
+
+    return {
+      resiliency: policy.resiliency === 'dual-parity' ? 'dual-parity' : 'three-way-mirror',
+      efficiency,
+      reserveDriveCount,
+      reserveTb,
+      allocatablePoolTb,
+      usableTb,
+      safeTb: usableTb * (1 - storageHeadroomPercent / 100),
+      storageHeadroomPercent,
+      rawTiB: hardware.rawStorageTb * TB_TO_TIB,
+      usableTiB: usableTb * TB_TO_TIB,
+    };
+  }
+
+  function calculateCompute(hardware, policy = DEFAULT_POLICY) {
+    const activeNodeCount = Math.max(1, hardware.nodeCount - (policy.nPlusOne ? 1 : 0));
+    const physicalCores = activeNodeCount * hardware.coresPerNode;
+    const cpuOvercommitRatio = numberAtLeast(
+      policy.cpuOvercommitRatio,
+      0.1,
+      DEFAULT_POLICY.cpuOvercommitRatio,
+    );
+    const cpuUtilizationPercent = percentage(
+      policy.cpuUtilizationPercent,
+      DEFAULT_POLICY.cpuUtilizationPercent,
+    );
+    const hostMemoryReserveGb = numberAtLeast(
+      policy.hostMemoryReserveGb,
+      0,
+      DEFAULT_POLICY.hostMemoryReserveGb,
+    );
+    const memoryUtilizationPercent = percentage(
+      policy.memoryUtilizationPercent,
+      DEFAULT_POLICY.memoryUtilizationPercent,
+    );
+    const rawRamGb = activeNodeCount * hardware.ramPerNodeGb;
+    const ramAfterHostReserveGb = activeNodeCount
+      * Math.max(0, hardware.ramPerNodeGb - hostMemoryReserveGb);
+
+    return {
+      activeNodeCount,
+      physicalCores,
+      rawRamGb,
+      cpuOvercommitRatio,
+      cpuUtilizationPercent,
+      policyVcpuCapacity: physicalCores * cpuOvercommitRatio * (cpuUtilizationPercent / 100),
+      hostMemoryReserveGb,
+      memoryUtilizationPercent,
+      ramAfterHostReserveGb,
+      policyRamCapacityGb: ramAfterHostReserveGb * (memoryUtilizationPercent / 100),
+    };
+  }
+
+  function calculateDemand(workloads = [], planningYears = 0) {
+    const years = numberAtLeast(planningYears, 0, 0);
+
+    return workloads.reduce((total, workload) => {
+      const quantity = Math.floor(numberAtLeast(workload.quantity, 0, 0));
+      const vcpu = numberAtLeast(workload.vcpu, 0, 0);
+      const ramGb = numberAtLeast(workload.ramGb, 0, 0);
+      const diskGb = numberAtLeast(workload.diskGb, 0, 0);
+      const annualGrowthPercent = numberAtLeast(workload.annualGrowthPercent, 0, 0);
+      const growthFactor = (1 + annualGrowthPercent / 100) ** years;
+
+      total.vmCount += quantity;
+      total.vcpu += quantity * vcpu;
+      total.ramGb += quantity * ramGb;
+      total.storageTb += (quantity * diskGb * growthFactor) / 1000;
+      return total;
+    }, { vmCount: 0, vcpu: 0, ramGb: 0, storageTb: 0 });
+  }
+
+  function ratioPercent(demand, capacity) {
+    if (capacity <= 0) {
+      return demand > 0 ? Infinity : 0;
+    }
+    return (demand / capacity) * 100;
+  }
+
+  function calculateScenario(cluster = DEFAULT_CLUSTER, policy = DEFAULT_POLICY, workloads = []) {
+    const hardware = calculateHardware(cluster);
+    const storage = calculateStorage(hardware, policy);
+    const compute = calculateCompute(hardware, policy);
+    const demand = calculateDemand(workloads, policy.planningYears);
+    const utilization = {
+      cpu: ratioPercent(demand.vcpu, compute.policyVcpuCapacity),
+      memory: ratioPercent(demand.ramGb, compute.policyRamCapacityGb),
+      storage: ratioPercent(demand.storageTb, storage.safeTb),
+    };
+    const limitingResource = Object.entries(utilization)
+      .sort((left, right) => right[1] - left[1])[0][0];
+    const highestUtilization = utilization[limitingResource];
+    const status = highestUtilization > 100
+      ? 'over-capacity'
+      : highestUtilization > 80 ? 'watch' : 'fits';
+
+    return {
+      hardware,
+      storage,
+      compute,
+      demand,
+      utilization,
+      limitingResource,
+      highestUtilization,
+      status,
+    };
+  }
+
+  return {
+    DEFAULT_CLUSTER,
+    DEFAULT_POLICY,
+    calculateHardware,
+    calculateStorage,
+    calculateCompute,
+    calculateDemand,
+    calculateScenario,
+  };
+}));
+  </script>
+  <script>
+(function attachSpreadsheetEngine(globalScope, factory) {
+  const api = factory();
+
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = api;
+  }
+
+  globalScope.HyperVSpreadsheet = api;
+  if (typeof window !== 'undefined') window.HyperVSpreadsheet = api;
+}(typeof globalThis !== 'undefined' ? globalThis : this, function createSpreadsheetEngine() {
+  'use strict';
+
+  const encoder = new TextEncoder();
+  const UNOFFICIAL_DISCLAIMER = 'Alat ini tidak resmi dari Microsoft. Hasil adalah estimasi berbasis asumsi dan input pengguna. Bukan rekomendasi, validasi, atau persetujuan sizing dari Microsoft. Verifikasi sebelum keputusan produksi.';
+
+  function csvCell(value) {
+    const text = String(value ?? '');
+    return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+  }
+
+  function csvRow(values) {
+    return values.map(csvCell).join(',');
+  }
+
+  function decimal(value, digits = 6) {
+    return Number(Number(value).toFixed(digits)).toString();
+  }
+
+  function statusLabel(status) {
+    if (status === 'over-capacity') return 'Over capacity';
+    if (status === 'watch') return 'Watch';
+    return 'Fits';
+  }
+
+  function createCsvExport(snapshot) {
+    const { cluster, policy, workloads, result } = snapshot;
+    const rows = [
+      ['Hyper-V Capacity Export'],
+      ['Generated at', snapshot.generatedAt],
+      ['Disclaimer', UNOFFICIAL_DISCLAIMER],
+      ['Status', statusLabel(result.status)],
+      ['Limiting resource', result.limitingResource],
+      ['Raw physical cores', result.hardware.totalPhysicalCores],
+      ['Raw RAM GB', result.hardware.totalRamGb],
+      ['Raw storage TB', decimal(result.hardware.rawStorageTb)],
+      ['Policy-safe vCPU', decimal(result.compute.policyVcpuCapacity)],
+      ['Policy-safe RAM GB', decimal(result.compute.policyRamCapacityGb)],
+      ['Policy-safe storage TB', decimal(result.storage.safeTb)],
+      [],
+      ['Assumptions'],
+      ['N+1 compute', policy.nPlusOne ? 'Yes' : 'No'],
+      ['Storage resiliency', policy.resiliency],
+      ['vCPU per physical core', policy.cpuOvercommitRatio],
+      ['CPU ceiling %', policy.cpuUtilizationPercent],
+      ['Host RAM reserve GB per active node', policy.hostMemoryReserveGb],
+      ['RAM ceiling %', policy.memoryUtilizationPercent],
+      ['Storage headroom %', policy.storageHeadroomPercent],
+      ['Planning years', policy.planningYears],
+      ['Boot M.2 included in S2D', cluster.bootCapacityIncluded ? 'Yes' : 'No'],
+      [],
+      ['Workload', 'Quantity', 'vCPU per VM', 'RAM GB per VM', 'Disk GB per VM', 'Annual Growth %', 'Projected Disk TB'],
+    ];
+
+    workloads.forEach((workload) => {
+      const growthFactor = (1 + Math.max(0, Number(workload.annualGrowthPercent) || 0) / 100)
+        ** Math.max(0, Number(policy.planningYears) || 0);
+      const projectedTb = (Math.max(0, Number(workload.quantity) || 0)
+        * Math.max(0, Number(workload.diskGb) || 0) * growthFactor) / 1000;
+      rows.push([
+        workload.name,
+        workload.quantity,
+        workload.vcpu,
+        workload.ramGb,
+        workload.diskGb,
+        workload.annualGrowthPercent,
+        decimal(projectedTb),
+      ]);
+    });
+
+    rows.push([
+      'TOTAL',
+      result.demand.vmCount,
+      result.demand.vcpu,
+      result.demand.ramGb,
+      '',
+      '',
+      decimal(result.demand.storageTb),
+    ]);
+    rows.push([]);
+    rows.push(['Not assessed', 'IOPS; latency; NUMA; licensing; backup; disaster recovery; switch oversubscription']);
+
+    return `\uFEFF${rows.map(csvRow).join('\r\n')}\r\n`;
+  }
+
+  function xml(value) {
+    return String(value ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&apos;');
+  }
+
+  function cell(reference, value, options = {}) {
+    const style = options.style === undefined ? '' : ` s="${options.style}"`;
+    if (options.formula) {
+      return `<c r="${reference}"${style}><f>${xml(options.formula)}</f></c>`;
+    }
+    if (options.type === 'number') {
+      return `<c r="${reference}"${style}><v>${Number(value)}</v></c>`;
+    }
+    return `<c r="${reference}" t="inlineStr"${style}><is><t xml:space="preserve">${xml(value)}</t></is></c>`;
+  }
+
+  function row(index, cells, options = {}) {
+    const height = options.height ? ` ht="${options.height}" customHeight="1"` : '';
+    return `<row r="${index}"${height}>${cells.join('')}</row>`;
+  }
+
+  function worksheetXml(rows, options = {}) {
+    const columns = (options.columns || []).map((width, index) => (
+      `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`
+    )).join('');
+    const freeze = options.freezeRow
+      ? `<sheetViews><sheetView workbookViewId="0"><pane ySplit="${options.freezeRow}" topLeftCell="A${options.freezeRow + 1}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>`
+      : '<sheetViews><sheetView workbookViewId="0"/></sheetViews>';
+    const merge = options.merge
+      ? `<mergeCells count="1"><mergeCell ref="${options.merge}"/></mergeCells>`
+      : '';
+    const filter = options.autoFilter ? `<autoFilter ref="${options.autoFilter}"/>` : '';
+
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+  <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${freeze}<sheetFormatPr defaultRowHeight="15"/><cols>${columns}</cols><sheetData>${rows.join('')}</sheetData>${filter}${merge}<pageMargins left="0.3" right="0.3" top="0.5" bottom="0.5" header="0.2" footer="0.2"/></worksheet>`;
+  }
+
+  function buildSummarySheet(snapshot, workloadTotalRow) {
+    const rows = [
+      row(1, [cell('A1', 'Hyper-V Capacity Summary', { style: 1 })], { height: 26 }),
+      row(2, [cell('A2', 'Generated at', { style: 2 }), cell('B2', snapshot.generatedAt, { style: 8 })]),
+      row(4, [cell('A4', 'Metric', { style: 2 }), cell('B4', 'Value', { style: 2 }), cell('C4', 'Unit', { style: 2 }), cell('D4', 'Basis', { style: 2 })]),
+      row(5, [cell('A5', 'Status'), cell('B5', '', { formula: 'IF(MAX(B20:B22)>1,"Over capacity",IF(MAX(B20:B22)>0.8,"Watch","Fits"))', style: 4 }), cell('D5', 'Highest utilization')]),
+      row(6, [cell('A6', 'Limiting resource'), cell('B6', '', { formula: 'INDEX(A20:A22,MATCH(MAX(B20:B22),B20:B22,0))', style: 4 })]),
+      row(8, [cell('A8', 'Raw physical cores'), cell('B8', '', { formula: 'Assumptions!B3*Assumptions!B4*Assumptions!B5', style: 4 }), cell('C8', 'cores'), cell('D8', 'Installed hardware')]),
+      row(9, [cell('A9', 'Raw RAM'), cell('B9', '', { formula: 'Assumptions!B3*Assumptions!B7*Assumptions!B8', style: 4 }), cell('C9', 'GB'), cell('D9', 'Installed hardware')]),
+      row(10, [cell('A10', 'Raw storage'), cell('B10', '', { formula: 'Assumptions!B3*Assumptions!B9*Assumptions!B10', style: 4 }), cell('C10', 'TB'), cell('D10', 'Decimal TB')]),
+      row(11, [cell('A11', 'Active nodes'), cell('B11', '', { formula: 'MAX(1,Assumptions!B3-IF(Assumptions!B14=1,1,0))', style: 4 }), cell('C11', 'nodes'), cell('D11', 'N+1 policy')]),
+      row(12, [cell('A12', 'Policy-safe vCPU'), cell('B12', '', { formula: 'B11*Assumptions!B4*Assumptions!B5*Assumptions!B16*Assumptions!B17/100', style: 4 }), cell('C12', 'vCPU'), cell('D12', 'Ratio and CPU ceiling')]),
+      row(13, [cell('A13', 'Policy-safe RAM'), cell('B13', '', { formula: 'B11*(Assumptions!B7*Assumptions!B8-Assumptions!B18)*Assumptions!B19/100', style: 4 }), cell('C13', 'GB'), cell('D13', 'Host reserve and RAM ceiling')]),
+      row(14, [cell('A14', 'Drive repair reserve'), cell('B14', '', { formula: 'MIN(Assumptions!B3,4)*Assumptions!B10', style: 4 }), cell('C14', 'TB'), cell('D14', 'One drive/node, max four')]),
+      row(15, [cell('A15', 'Usable resilient storage'), cell('B15', '', { formula: '(B10-B14)*IF(Assumptions!B15="dual-parity",0.5,1/3)', style: 4 }), cell('C15', 'TB'), cell('D15', 'After resiliency')]),
+      row(16, [cell('A16', 'Policy-safe storage'), cell('B16', '', { formula: 'B15*(1-Assumptions!B21/100)', style: 4 }), cell('C16', 'TB'), cell('D16', 'After headroom')]),
+      row(18, [cell('A18', 'Demand and utilization', { style: 2 }), cell('B18', 'Value', { style: 2 }), cell('C18', 'Unit', { style: 2 }), cell('D18', 'Formula', { style: 2 })]),
+      row(19, [cell('A19', 'Total VMs'), cell('B19', '', { formula: `Workloads!B${workloadTotalRow}`, style: 4 }), cell('C19', 'VMs')]),
+      row(20, [cell('A20', 'CPU'), cell('B20', '', { formula: `IF(B12=0,IF(Workloads!C${workloadTotalRow}>0,1,0),Workloads!C${workloadTotalRow}/B12)`, style: 5 }), cell('C20', '% used'), cell('D20', `Workloads!C${workloadTotalRow} / safe vCPU`)]),
+      row(21, [cell('A21', 'RAM'), cell('B21', '', { formula: `IF(B13=0,IF(Workloads!D${workloadTotalRow}>0,1,0),Workloads!D${workloadTotalRow}/B13)`, style: 5 }), cell('C21', '% used'), cell('D21', `Workloads!D${workloadTotalRow} / safe RAM`)]),
+      row(22, [cell('A22', 'Storage'), cell('B22', '', { formula: `IF(B16=0,IF(Workloads!G${workloadTotalRow}>0,1,0),Workloads!G${workloadTotalRow}/B16)`, style: 5 }), cell('C22', '% used'), cell('D22', `Workloads!G${workloadTotalRow} / safe storage`)]),
+      row(24, [cell('A24', 'Disclaimer', { style: 9 }), cell('B24', UNOFFICIAL_DISCLAIMER, { style: 9 })]),
+      row(25, [cell('A25', 'Not assessed', { style: 9 }), cell('B25', 'IOPS, latency, NUMA, licensing, backup, DR, and switch oversubscription are not assessed.', { style: 9 })]),
+    ];
+    return worksheetXml(rows, { columns: [31, 22, 14, 42], merge: 'A1:D1', freezeRow: 4 });
+  }
+
+  function buildWorkloadsSheet(snapshot) {
+    const rows = [
+      row(1, [
+        cell('A1', 'Workload', { style: 2 }),
+        cell('B1', 'Quantity', { style: 2 }),
+        cell('C1', 'vCPU / VM', { style: 2 }),
+        cell('D1', 'RAM GB / VM', { style: 2 }),
+        cell('E1', 'Disk GB / VM', { style: 2 }),
+        cell('F1', 'Annual Growth %', { style: 2 }),
+        cell('G1', 'Projected Disk TB', { style: 2 }),
+      ]),
+    ];
+
+    snapshot.workloads.forEach((workload, index) => {
+      const rowNumber = index + 2;
+      rows.push(row(rowNumber, [
+        cell(`A${rowNumber}`, workload.name, { style: 3 }),
+        cell(`B${rowNumber}`, workload.quantity, { type: 'number', style: 3 }),
+        cell(`C${rowNumber}`, workload.vcpu, { type: 'number', style: 3 }),
+        cell(`D${rowNumber}`, workload.ramGb, { type: 'number', style: 3 }),
+        cell(`E${rowNumber}`, workload.diskGb, { type: 'number', style: 3 }),
+        cell(`F${rowNumber}`, workload.annualGrowthPercent, { type: 'number', style: 3 }),
+        cell(`G${rowNumber}`, '', { formula: `B${rowNumber}*E${rowNumber}*(1+F${rowNumber}/100)^Assumptions!$B$20/1000`, style: 4 }),
+      ]));
+    });
+
+    const totalRow = snapshot.workloads.length + 3;
+    const firstDataRow = 2;
+    const lastDataRow = Math.max(firstDataRow, snapshot.workloads.length + 1);
+    rows.push(row(totalRow, [
+      cell(`A${totalRow}`, 'TOTAL', { style: 2 }),
+      cell(`B${totalRow}`, '', { formula: `SUM(B${firstDataRow}:B${lastDataRow})`, style: 4 }),
+      cell(`C${totalRow}`, '', { formula: `SUMPRODUCT(B${firstDataRow}:B${lastDataRow},C${firstDataRow}:C${lastDataRow})`, style: 4 }),
+      cell(`D${totalRow}`, '', { formula: `SUMPRODUCT(B${firstDataRow}:B${lastDataRow},D${firstDataRow}:D${lastDataRow})`, style: 4 }),
+      cell(`G${totalRow}`, '', { formula: `SUM(G${firstDataRow}:G${lastDataRow})`, style: 4 }),
+    ]));
+
+    return {
+      totalRow,
+      xml: worksheetXml(rows, {
+        columns: [27, 12, 13, 15, 16, 18, 20],
+        freezeRow: 1,
+        autoFilter: `A1:G${Math.max(1, snapshot.workloads.length + 1)}`,
+      }),
+    };
+  }
+
+  function buildAssumptionsSheet(snapshot) {
+    const { cluster, policy } = snapshot;
+    const values = [
+      ['Node count', cluster.nodeCount, 'nodes', 'Hardware'],
+      ['Sockets per node', cluster.socketsPerNode, 'sockets', 'Hardware'],
+      ['Cores per socket', cluster.coresPerSocket, 'cores', 'Hardware'],
+      ['Clock speed', cluster.clockGhz, 'GHz', 'Hardware'],
+      ['DIMMs per node', cluster.dimmsPerNode, 'DIMMs', 'Hardware'],
+      ['GB per DIMM', cluster.gbPerDimm, 'GB', 'Hardware'],
+      ['Capacity drives per node', cluster.capacityDrivesPerNode, 'drives', 'Hardware'],
+      ['Capacity drive size', cluster.capacityDriveTb, 'TB', 'Hardware'],
+      ['Boot drives per node', cluster.bootDrivesPerNode, 'drives', 'Boot only'],
+      ['Boot drive size', cluster.bootDriveGb, 'GB', 'Boot only'],
+      ['Boot included in S2D', cluster.bootCapacityIncluded ? 1 : 0, '1=yes', 'Hardware'],
+      ['N+1 compute', policy.nPlusOne ? 1 : 0, '1=yes', 'Policy assumption'],
+      ['Storage resiliency', policy.resiliency, 'mode', 'Microsoft-supported option'],
+      ['vCPU per physical core', policy.cpuOvercommitRatio, 'ratio', 'Policy assumption'],
+      ['CPU ceiling', policy.cpuUtilizationPercent, '%', 'Policy assumption'],
+      ['Host RAM reserve', policy.hostMemoryReserveGb, 'GB/node', 'Policy assumption'],
+      ['RAM ceiling', policy.memoryUtilizationPercent, '%', 'Policy assumption'],
+      ['Planning horizon', policy.planningYears, 'years', 'Policy assumption'],
+      ['Storage headroom', policy.storageHeadroomPercent, '%', 'Policy assumption'],
+      ['Network adapters per node', cluster.networkAdaptersPerNode, 'adapters', 'Hardware'],
+      ['Ports per adapter', cluster.portsPerAdapter, 'ports', 'Hardware'],
+      ['Network speed', cluster.networkSpeedGbps, 'GbE', 'Hardware'],
+    ];
+    const rows = [
+      row(1, [cell('A1', 'Hardware and Policy Assumptions', { style: 1 })], { height: 26 }),
+      row(2, [cell('A2', 'Field', { style: 2 }), cell('B2', 'Value', { style: 2 }), cell('C2', 'Unit', { style: 2 }), cell('D2', 'Classification', { style: 2 })]),
+    ];
+    values.forEach((entry, index) => {
+      const rowNumber = index + 3;
+      const isNumber = typeof entry[1] === 'number';
+      rows.push(row(rowNumber, [
+        cell(`A${rowNumber}`, entry[0]),
+        cell(`B${rowNumber}`, entry[1], { type: isNumber ? 'number' : 'string', style: 3 }),
+        cell(`C${rowNumber}`, entry[2]),
+        cell(`D${rowNumber}`, entry[3], { style: entry[3] === 'Policy assumption' ? 9 : 8 }),
+      ]));
+    });
+    return worksheetXml(rows, { columns: [31, 22, 16, 32], merge: 'A1:D1', freezeRow: 2, autoFilter: 'A2:D24' });
+  }
+
+  function buildSourcesSheet(snapshot) {
+    const rows = [
+      row(1, [cell('A1', 'Sources and Scope', { style: 1 })], { height: 26 }),
+      row(2, [cell('A2', 'Source', { style: 2 }), cell('B2', 'URL', { style: 2 })]),
+    ];
+    snapshot.sources.forEach((source, index) => {
+      const rowNumber = index + 3;
+      rows.push(row(rowNumber, [
+        cell(`A${rowNumber}`, `Microsoft Learn ${index + 1}`),
+        cell(`B${rowNumber}`, source, { style: 7 }),
+      ]));
+    });
+    const noteRow = snapshot.sources.length + 5;
+    rows.push(row(noteRow, [cell(`A${noteRow}`, 'Disclaimer', { style: 9 }), cell(`B${noteRow}`, UNOFFICIAL_DISCLAIMER, { style: 9 })]));
+    rows.push(row(noteRow + 1, [cell(`A${noteRow + 1}`, 'Scope note', { style: 9 }), cell(`B${noteRow + 1}`, 'Microsoft Learn is a technical reference and does not imply endorsement of this tool. WebIQ was used only for secondary discovery.', { style: 9 })]));
+    return worksheetXml(rows, { columns: [24, 105], merge: 'A1:B1', freezeRow: 2 });
+  }
+
+  function crc32(bytes) {
+    let crc = 0xffffffff;
+    for (const byte of bytes) {
+      crc ^= byte;
+      for (let bit = 0; bit < 8; bit += 1) {
+        crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
+      }
+    }
+    return (crc ^ 0xffffffff) >>> 0;
+  }
+
+  function dosDateTime(date) {
+    const safeDate = Number.isNaN(date.getTime()) ? new Date('2026-01-01T00:00:00Z') : date;
+    const year = Math.max(1980, safeDate.getUTCFullYear());
+    const dosTime = (safeDate.getUTCHours() << 11)
+      | (safeDate.getUTCMinutes() << 5)
+      | Math.floor(safeDate.getUTCSeconds() / 2);
+    const dosDate = ((year - 1980) << 9)
+      | ((safeDate.getUTCMonth() + 1) << 5)
+      | safeDate.getUTCDate();
+    return { dosTime, dosDate };
+  }
+
+  function writeUint16(target, offset, value) {
+    new DataView(target.buffer, target.byteOffset, target.byteLength).setUint16(offset, value, true);
+  }
+
+  function writeUint32(target, offset, value) {
+    new DataView(target.buffer, target.byteOffset, target.byteLength).setUint32(offset, value, true);
+  }
+
+  function concatBytes(chunks) {
+    const output = new Uint8Array(chunks.reduce((sum, chunk) => sum + chunk.length, 0));
+    let offset = 0;
+    chunks.forEach((chunk) => {
+      output.set(chunk, offset);
+      offset += chunk.length;
+    });
+    return output;
+  }
+
+  function zipStored(files, generatedAt) {
+    const localChunks = [];
+    const centralChunks = [];
+    const { dosTime, dosDate } = dosDateTime(new Date(generatedAt));
+    let localOffset = 0;
+
+    Object.entries(files).forEach(([name, content]) => {
+      const nameBytes = encoder.encode(name);
+      const data = encoder.encode(content);
+      const checksum = crc32(data);
+      const localHeader = new Uint8Array(30);
+      writeUint32(localHeader, 0, 0x04034b50);
+      writeUint16(localHeader, 4, 20);
+      writeUint16(localHeader, 10, dosTime);
+      writeUint16(localHeader, 12, dosDate);
+      writeUint32(localHeader, 14, checksum);
+      writeUint32(localHeader, 18, data.length);
+      writeUint32(localHeader, 22, data.length);
+      writeUint16(localHeader, 26, nameBytes.length);
+      localChunks.push(localHeader, nameBytes, data);
+
+      const centralHeader = new Uint8Array(46);
+      writeUint32(centralHeader, 0, 0x02014b50);
+      writeUint16(centralHeader, 4, 20);
+      writeUint16(centralHeader, 6, 20);
+      writeUint16(centralHeader, 12, dosTime);
+      writeUint16(centralHeader, 14, dosDate);
+      writeUint32(centralHeader, 16, checksum);
+      writeUint32(centralHeader, 20, data.length);
+      writeUint32(centralHeader, 24, data.length);
+      writeUint16(centralHeader, 28, nameBytes.length);
+      writeUint32(centralHeader, 42, localOffset);
+      centralChunks.push(centralHeader, nameBytes);
+      localOffset += localHeader.length + nameBytes.length + data.length;
+    });
+
+    const localData = concatBytes(localChunks);
+    const centralData = concatBytes(centralChunks);
+    const end = new Uint8Array(22);
+    const fileCount = Object.keys(files).length;
+    writeUint32(end, 0, 0x06054b50);
+    writeUint16(end, 8, fileCount);
+    writeUint16(end, 10, fileCount);
+    writeUint32(end, 12, centralData.length);
+    writeUint32(end, 16, localData.length);
+    return concatBytes([localData, centralData, end]);
+  }
+
+  function createXlsxExport(snapshot) {
+    const workloads = buildWorkloadsSheet(snapshot);
+    const files = {
+      '[Content_Types].xml': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet3.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet4.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`,
+      '_rels/.rels': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>`,
+      'docProps/core.xml': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>Hyper-V Capacity Export</dc:title><dc:creator>Hyper-V Capacity Console</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">${xml(snapshot.generatedAt)}</dcterms:created></cp:coreProperties>`,
+      'docProps/app.xml': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>Hyper-V Capacity Console</Application><AppVersion>1.0</AppVersion></Properties>`,
+      'xl/workbook.xml': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Summary" sheetId="1" r:id="rId1"/><sheet name="Workloads" sheetId="2" r:id="rId2"/><sheet name="Assumptions" sheetId="3" r:id="rId3"/><sheet name="Sources" sheetId="4" r:id="rId4"/></sheets><calcPr calcId="191029" calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1"/></workbook>`,
+      'xl/_rels/workbook.xml.rels': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet3.xml"/><Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet4.xml"/><Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`,
+      'xl/styles.xml': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="2"><numFmt numFmtId="164" formatCode="0.00"/><numFmt numFmtId="165" formatCode="0.0%"/></numFmts><fonts count="5"><font><sz val="10"/><name val="Arial"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="16"/><name val="Arial"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="10"/><name val="Arial"/></font><font><color rgb="FF0000FF"/><sz val="10"/><name val="Arial"/></font><font><color rgb="FF008000"/><u/><sz val="10"/><name val="Arial"/></font></fonts><fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFB11F4B"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF2CC"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF8E7EC"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFD9D9D9"/></left><right style="thin"><color rgb="FFD9D9D9"/></right><top style="thin"><color rgb="FFD9D9D9"/></top><bottom style="thin"><color rgb="FFD9D9D9"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="10"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/><xf numFmtId="0" fontId="3" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"/><xf numFmtId="165" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"/><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/><xf numFmtId="0" fontId="4" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1"/><xf numFmtId="0" fontId="0" fillId="4" borderId="1" xfId="0" applyFill="1" applyBorder="1"/><xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`,
+      'xl/worksheets/sheet1.xml': buildSummarySheet(snapshot, workloads.totalRow),
+      'xl/worksheets/sheet2.xml': workloads.xml,
+      'xl/worksheets/sheet3.xml': buildAssumptionsSheet(snapshot),
+      'xl/worksheets/sheet4.xml': buildSourcesSheet(snapshot),
+    };
+    return zipStored(files, snapshot.generatedAt);
+  }
+
+  return { createCsvExport, createXlsxExport };
+}));
+  </script>
+  <script>
+(function initializeCalculator() {
+  'use strict';
+
+  const engine = window.HyperVCapacity;
+  const spreadsheet = window.HyperVSpreadsheet;
+  const unofficialDisclaimer = 'Alat ini tidak resmi dari Microsoft. Hasil adalah estimasi berbasis asumsi dan input pengguna. Bukan rekomendasi, validasi, atau persetujuan sizing dari Microsoft. Verifikasi sebelum keputusan produksi.';
+  const defaults = engine.DEFAULT_POLICY;
+  const cluster = engine.DEFAULT_CLUSTER;
+
+  const sampleWorkloads = [
+    { name: 'Application', quantity: 12, vcpu: 4, ramGb: 16, diskGb: 200, annualGrowthPercent: 10 },
+    { name: 'SQL Server', quantity: 4, vcpu: 8, ramGb: 64, diskGb: 800, annualGrowthPercent: 15 },
+    { name: 'Infrastructure', quantity: 6, vcpu: 2, ramGb: 8, diskGb: 120, annualGrowthPercent: 5 },
+  ];
+
+  let workloads = sampleWorkloads.map((workload) => ({ ...workload }));
+
+  const byId = (id) => document.getElementById(id);
+  const numberFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 });
+  const tbFormat = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  function finiteInput(id, fallback) {
+    const value = byId(id).valueAsNumber;
+    return Number.isFinite(value) ? value : fallback;
+  }
+
+  function readPolicy() {
+    return {
+      nPlusOne: byId('n-plus-one').checked,
+      resiliency: byId('resiliency').value,
+      cpuOvercommitRatio: finiteInput('cpu-ratio', defaults.cpuOvercommitRatio),
+      cpuUtilizationPercent: finiteInput('cpu-utilization', defaults.cpuUtilizationPercent),
+      hostMemoryReserveGb: finiteInput('host-memory-reserve', defaults.hostMemoryReserveGb),
+      memoryUtilizationPercent: finiteInput('memory-utilization', defaults.memoryUtilizationPercent),
+      storageHeadroomPercent: finiteInput('storage-headroom', defaults.storageHeadroomPercent),
+      planningYears: finiteInput('planning-years', defaults.planningYears),
+    };
+  }
+
+  function escapeAttribute(value) {
+    return String(value)
+      .replaceAll('&', '&amp;')
+      .replaceAll('"', '&quot;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;');
+  }
+
+  function workloadRow(workload, index) {
+    return `
+      <tr data-workload-index="${index}">
+        <td><label class="visually-hidden" for="name-${index}">Workload name</label><input id="name-${index}" data-field="name" type="text" value="${escapeAttribute(workload.name)}"></td>
+        <td><label class="visually-hidden" for="quantity-${index}">Quantity</label><input id="quantity-${index}" data-field="quantity" type="number" min="0" max="10000" step="1" value="${workload.quantity}"></td>
+        <td><label class="visually-hidden" for="vcpu-${index}">vCPU per VM</label><input id="vcpu-${index}" data-field="vcpu" type="number" min="0" max="2048" step="1" value="${workload.vcpu}"></td>
+        <td><label class="visually-hidden" for="ram-${index}">RAM GB per VM</label><input id="ram-${index}" data-field="ramGb" type="number" min="0" max="24576" step="1" value="${workload.ramGb}"></td>
+        <td><label class="visually-hidden" for="disk-${index}">Disk GB per VM</label><input id="disk-${index}" data-field="diskGb" type="number" min="0" max="1000000" step="10" value="${workload.diskGb}"></td>
+        <td><label class="visually-hidden" for="growth-${index}">Annual growth percent</label><div class="input-unit"><input id="growth-${index}" data-field="annualGrowthPercent" type="number" min="0" max="500" step="1" value="${workload.annualGrowthPercent}"><span>%</span></div></td>
+        <td><button class="remove-row" type="button" data-remove-index="${index}" aria-label="Remove ${escapeAttribute(workload.name)}">Remove</button></td>
+      </tr>`;
+  }
+
+  function renderWorkloads() {
+    byId('workload-body').innerHTML = workloads.map(workloadRow).join('');
+  }
+
+  function syncWorkloadFromInput(input) {
+    const row = input.closest('[data-workload-index]');
+    if (!row) return;
+    const index = Number(row.dataset.workloadIndex);
+    const field = input.dataset.field;
+    workloads[index][field] = input.type === 'number'
+      ? (Number.isFinite(input.valueAsNumber) ? input.valueAsNumber : 0)
+      : input.value;
+  }
+
+  function formatPercent(value) {
+    return Number.isFinite(value) ? `${numberFormat.format(value)}%` : 'Unavailable';
+  }
+
+  function statusLabel(status) {
+    if (status === 'over-capacity') return 'Over capacity';
+    if (status === 'watch') return 'Watch';
+    return 'Fits';
+  }
+
+  function resourceLabel(resource) {
+    return { cpu: 'vCPU', memory: 'RAM', storage: 'Storage' }[resource];
+  }
+
+  function updateNodeRail(scenario) {
+    document.querySelectorAll('.node-card').forEach((node) => {
+      const isReserve = scenario.compute.activeNodeCount < scenario.hardware.nodeCount
+        && Number(node.dataset.nodeIndex) === scenario.hardware.nodeCount;
+      node.classList.toggle('is-reserve', isReserve);
+      node.querySelector('.node-state').textContent = isReserve ? 'N+1 reserve' : 'Active';
+    });
+  }
+
+  function updateMeter(resource, demand, capacity, utilization, isLimiting) {
+    const meter = document.querySelector(`[data-resource="${resource}"]`);
+    const state = utilization > 100 ? 'over-capacity' : utilization > 80 ? 'watch' : 'fits';
+    meter.classList.remove('fits', 'watch', 'over-capacity');
+    meter.classList.add(state);
+    meter.classList.toggle('is-limiting', isLimiting);
+    byId(`${resource}-percent`).textContent = formatPercent(utilization);
+    const progress = byId(`${resource}-progress`);
+    progress.value = Number.isFinite(utilization) ? Math.min(utilization, 100) : 100;
+    progress.textContent = formatPercent(utilization);
+
+    if (resource === 'cpu') {
+      byId('cpu-demand').textContent = numberFormat.format(demand);
+      byId('cpu-capacity').textContent = numberFormat.format(capacity);
+    } else if (resource === 'memory') {
+      byId('memory-demand').textContent = `${numberFormat.format(demand)} GB`;
+      byId('memory-capacity').textContent = `${numberFormat.format(capacity)} GB`;
+    } else {
+      byId('storage-demand').textContent = `${tbFormat.format(demand)} TB`;
+      byId('storage-capacity').textContent = `${tbFormat.format(capacity)} TB`;
+    }
+  }
+
+  function updateLedger(scenario) {
+    const { hardware, compute, storage, demand } = scenario;
+    byId('raw-cores').textContent = numberFormat.format(hardware.totalPhysicalCores);
+    byId('raw-ram').textContent = `${numberFormat.format(hardware.totalRamGb)} GB`;
+    byId('raw-storage').textContent = `${tbFormat.format(hardware.rawStorageTb)} TB`;
+    byId('raw-network').textContent = `${hardware.networkPortsPerNode} x ${hardware.networkSpeedGbps} GbE`;
+    byId('ledger-raw-storage').textContent = `${tbFormat.format(hardware.rawStorageTb)} TB`;
+    byId('ledger-n1-cores').textContent = `${numberFormat.format(compute.physicalCores)} cores`;
+    byId('ledger-n1-ram').textContent = `${numberFormat.format(compute.rawRamGb)} GB`;
+    byId('ledger-reserve').textContent = `-${tbFormat.format(storage.reserveTb)} TB`;
+    byId('ledger-resiliency-label').textContent = storage.resiliency === 'dual-parity' ? 'Dual parity' : 'Three-way mirror';
+    byId('ledger-safe-vcpu').textContent = `${numberFormat.format(compute.policyVcpuCapacity)} vCPU`;
+    byId('ledger-safe-ram').textContent = `${numberFormat.format(compute.policyRamCapacityGb)} GB`;
+    byId('ledger-usable-storage').textContent = `${tbFormat.format(storage.usableTb)} TB usable`;
+    byId('ledger-efficiency').textContent = `${numberFormat.format(storage.efficiency * 100)}% efficiency`;
+    byId('ledger-policy-vcpu').textContent = `${numberFormat.format(compute.policyVcpuCapacity)} vCPU`;
+    byId('ledger-policy-ram').textContent = `${numberFormat.format(compute.policyRamCapacityGb)} GB`;
+    byId('ledger-safe-storage').textContent = `${tbFormat.format(storage.safeTb)} TB`;
+    byId('total-vms').textContent = `${numberFormat.format(demand.vmCount)} VMs`;
+    byId('total-vcpu').textContent = `${numberFormat.format(demand.vcpu)} vCPU`;
+    byId('total-demand-ram').textContent = `${numberFormat.format(demand.ramGb)} GB`;
+    byId('total-demand-storage').textContent = `${tbFormat.format(demand.storageTb)} TB`;
+    byId('growth-horizon').textContent = `at year ${readPolicy().planningYears}`;
+  }
+
+  function update() {
+    const scenario = engine.calculateScenario(cluster, readPolicy(), workloads);
+    updateNodeRail(scenario);
+    updateLedger(scenario);
+    updateMeter('cpu', scenario.demand.vcpu, scenario.compute.policyVcpuCapacity, scenario.utilization.cpu, scenario.limitingResource === 'cpu');
+    updateMeter('memory', scenario.demand.ramGb, scenario.compute.policyRamCapacityGb, scenario.utilization.memory, scenario.limitingResource === 'memory');
+    updateMeter('storage', scenario.demand.storageTb, scenario.storage.safeTb, scenario.utilization.storage, scenario.limitingResource === 'storage');
+    byId('limiting-resource').textContent = resourceLabel(scenario.limitingResource);
+
+    const status = byId('scenario-status');
+    status.className = `status-badge ${scenario.status}`;
+    status.textContent = statusLabel(scenario.status);
+  }
+
+  function setPolicy(policy) {
+    byId('n-plus-one').checked = policy.nPlusOne;
+    byId('resiliency').value = policy.resiliency;
+    byId('cpu-ratio').value = policy.cpuOvercommitRatio;
+    byId('cpu-utilization').value = policy.cpuUtilizationPercent;
+    byId('host-memory-reserve').value = policy.hostMemoryReserveGb;
+    byId('memory-utilization').value = policy.memoryUtilizationPercent;
+    byId('storage-headroom').value = policy.storageHeadroomPercent;
+    byId('planning-years').value = policy.planningYears;
+  }
+
+  function reset() {
+    workloads = [];
+    setPolicy(defaults);
+    renderWorkloads();
+    update();
+  }
+
+  function loadSample() {
+    workloads = sampleWorkloads.map((workload) => ({ ...workload }));
+    setPolicy(defaults);
+    renderWorkloads();
+    update();
+  }
+
+  function createSnapshot() {
+    const policy = readPolicy();
+    const scenario = engine.calculateScenario(cluster, policy, workloads);
+    return {
+      generatedAt: new Date().toISOString(),
+      disclaimer: unofficialDisclaimer,
+      cluster,
+      policy,
+      workloads,
+      result: scenario,
+      sources: [
+        'https://learn.microsoft.com/windows-server/storage/storage-spaces/plan-volumes',
+        'https://learn.microsoft.com/windows-server/storage/storage-spaces/storage-spaces-direct-hardware-requirements',
+        'https://learn.microsoft.com/windows-server/virtualization/hyper-v/failover-cluster-network-recommendations',
+        'https://learn.microsoft.com/windows-server/virtualization/hyper-v/dynamic-memory',
+      ],
+    };
+  }
+
+  function download(content, mimeType, filename) {
+    const blob = new Blob([content], { type: mimeType });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
+
+  function exportSnapshot() {
+    download(
+      JSON.stringify(createSnapshot(), null, 2),
+      'application/json',
+      'hyperv-capacity-snapshot.json',
+    );
+  }
+
+  function exportCsv() {
+    download(
+      spreadsheet.createCsvExport(createSnapshot()),
+      'text/csv;charset=utf-8',
+      'hyperv-capacity-export.csv',
+    );
+  }
+
+  function exportXlsx() {
+    download(
+      spreadsheet.createXlsxExport(createSnapshot()),
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'hyperv-capacity-export.xlsx',
+    );
+  }
+
+  byId('policy-form').addEventListener('input', update);
+  byId('workload-body').addEventListener('input', (event) => {
+    syncWorkloadFromInput(event.target);
+    update();
+  });
+  byId('workload-body').addEventListener('click', (event) => {
+    const button = event.target.closest('[data-remove-index]');
+    if (!button) return;
+    workloads.splice(Number(button.dataset.removeIndex), 1);
+    renderWorkloads();
+    update();
+  });
+  byId('add-workload').addEventListener('click', () => {
+    workloads.push({ name: 'New workload', quantity: 1, vcpu: 2, ramGb: 8, diskGb: 100, annualGrowthPercent: 10 });
+    renderWorkloads();
+    update();
+    const newRowName = byId(`name-${workloads.length - 1}`);
+    newRowName.focus();
+    newRowName.select();
+  });
+  byId('load-sample').addEventListener('click', loadSample);
+  byId('reset-calculator').addEventListener('click', reset);
+  byId('export-snapshot').addEventListener('click', exportSnapshot);
+  byId('export-csv').addEventListener('click', exportCsv);
+  byId('export-xlsx').addEventListener('click', exportXlsx);
+
+  renderWorkloads();
+  update();
+}());
+  </script>
+</body>
+</html>
