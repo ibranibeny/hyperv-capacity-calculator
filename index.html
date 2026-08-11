@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Kalkulator kapasitas VM untuk cluster Hyper-V HCI empat node.">
+  <meta name="description" content="VM capacity calculator for a four-node Hyper-V HCI cluster.">
   <title>Hyper-V Capacity Console</title>
   <script>
     (() => {
@@ -317,7 +317,7 @@ thead th { color: var(--cp-text-muted); font-size: 11px; text-transform: upperca
   </style>
 </head>
 <body>
-  <a class="skip-link" href="#workloads">Lewati ke workload VM</a>
+  <a class="skip-link" href="#workloads">Skip to VM workloads</a>
   <header class="topbar">
     <div class="brand-lockup">
       <span class="brand-mark" aria-hidden="true">HV</span>
@@ -326,7 +326,7 @@ thead th { color: var(--cp-text-muted); font-size: 11px; text-transform: upperca
         <h1>Hyper-V Capacity Console</h1>
       </div>
     </div>
-    <div class="header-actions" aria-label="Tindakan kalkulator">
+    <div class="header-actions" aria-label="Calculator actions">
       <button class="button secondary" id="load-sample" type="button">Load sample</button>
       <button class="button secondary" id="export-snapshot" type="button">Export JSON</button>
       <button class="button secondary" id="export-csv" type="button">Export CSV</button>
@@ -336,8 +336,8 @@ thead th { color: var(--cp-text-muted); font-size: 11px; text-transform: upperca
   </header>
 
   <aside class="disclaimer-band" id="unofficial-disclaimer" role="note" aria-label="Disclaimer">
-    <strong>Alat ini tidak resmi dari Microsoft.</strong>
-    <span>Hasil adalah estimasi berbasis asumsi dan input pengguna. Bukan rekomendasi, validasi, atau persetujuan sizing dari Microsoft. Verifikasi dengan data workload aktual, Microsoft, dan vendor/OEM sebelum keputusan produksi.</span>
+    <strong>This is not an official Microsoft tool.</strong>
+    <span>Results are estimates based on assumptions and user-provided inputs. They are not Microsoft recommendations, validation, or sizing approval. Validate against actual workload data and consult Microsoft and your hardware vendor/OEM before making production decisions.</span>
   </aside>
 
   <main>
@@ -347,10 +347,10 @@ thead th { color: var(--cp-text-muted); font-size: 11px; text-transform: upperca
           <p class="utility-label">Cluster baseline / fixed hardware</p>
           <h2 id="cluster-heading">Four-node compute and storage rail</h2>
         </div>
-        <p class="section-note">M.2 480 GB = boot RAID1, tidak masuk pool S2D.</p>
+        <p class="section-note">M.2 480 GB = boot RAID 1, excluded from the S2D pool.</p>
       </div>
 
-      <div class="node-rail" id="node-rail" aria-label="Empat node Hyper-V">
+      <div class="node-rail" id="node-rail" aria-label="Four Hyper-V nodes">
         <article class="node-card" data-node-index="1">
           <div class="node-head"><span>NODE 01</span><span class="node-state">Active</span></div>
           <strong>32 cores</strong><span>512 GB RAM</span><span>7 x 1.92 TB NVMe</span>
@@ -392,7 +392,7 @@ thead th { color: var(--cp-text-muted); font-size: 11px; text-transform: upperca
           </label>
 
           <label class="toggle-field">
-            <span><strong>N+1 compute</strong><small>Satu node tidak dihitung untuk VM.</small></span>
+            <span><strong>N+1 compute</strong><small>One node is excluded from VM capacity.</small></span>
             <input id="n-plus-one" name="nPlusOne" type="checkbox" checked>
           </label>
 
@@ -410,8 +410,8 @@ thead th { color: var(--cp-text-muted); font-size: 11px; text-transform: upperca
           </div>
         </form>
         <div class="assumption-callout">
-          <strong>Jujur tentang default</strong>
-          <p>Rasio CPU, reserve RAM, dan ceiling 80% adalah kebijakan awal yang editable, bukan batas resmi Microsoft.</p>
+          <strong>About the defaults</strong>
+          <p>The CPU ratio, RAM reserve, and 80% ceilings are editable planning assumptions, not official Microsoft limits.</p>
         </div>
       </aside>
 
@@ -427,7 +427,7 @@ thead th { color: var(--cp-text-muted); font-size: 11px; text-transform: upperca
             <tfoot><tr><th scope="row">Projected demand</th><td id="total-vms">0 VMs</td><td id="total-vcpu">0 vCPU</td><td id="total-demand-ram">0 GB</td><td id="total-demand-storage">0 TB</td><td colspan="2" id="growth-horizon">at year 1</td></tr></tfoot>
           </table>
         </div>
-        <p class="table-help">RAM adalah planned allocation. Dynamic Memory tidak dihitung sebagai kapasitas yang dijamin.</p>
+        <p class="table-help">RAM is the planned allocation. Dynamic Memory is not counted as guaranteed capacity.</p>
       </section>
     </div>
 
@@ -503,7 +503,7 @@ thead th { color: var(--cp-text-muted); font-size: 11px; text-transform: upperca
     </section>
 
     <footer class="sources">
-      <p><strong>Sources checked 11 Aug 2026.</strong> Microsoft Learn digunakan sebagai referensi teknis dan tidak menyiratkan dukungan atau endorsement atas alat ini; WebIQ hanya digunakan untuk secondary discovery.</p>
+      <p><strong>Sources checked 11 Aug 2026.</strong> Microsoft Learn is used as a technical reference and does not imply support or endorsement of this tool; WebIQ was used only for secondary discovery.</p>
       <nav aria-label="Sources">
         <a href="https://learn.microsoft.com/windows-server/storage/storage-spaces/plan-volumes" target="_blank" rel="noopener noreferrer">Plan S2D volumes</a>
         <a href="https://learn.microsoft.com/windows-server/storage/storage-spaces/storage-spaces-direct-hardware-requirements" target="_blank" rel="noopener noreferrer">S2D hardware requirements</a>
@@ -748,7 +748,7 @@ thead th { color: var(--cp-text-muted); font-size: 11px; text-transform: upperca
   'use strict';
 
   const encoder = new TextEncoder();
-  const UNOFFICIAL_DISCLAIMER = 'Alat ini tidak resmi dari Microsoft. Hasil adalah estimasi berbasis asumsi dan input pengguna. Bukan rekomendasi, validasi, atau persetujuan sizing dari Microsoft. Verifikasi sebelum keputusan produksi.';
+  const UNOFFICIAL_DISCLAIMER = 'This is not an official Microsoft tool. Results are estimates based on assumptions and user-provided inputs. They are not Microsoft recommendations, validation, or sizing approval. Validate before making production decisions.';
 
   function csvCell(value) {
     const text = String(value ?? '');
@@ -926,12 +926,13 @@ thead th { color: var(--cp-text-muted); font-size: 11px; text-transform: upperca
     const totalRow = snapshot.workloads.length + 3;
     const firstDataRow = 2;
     const lastDataRow = Math.max(firstDataRow, snapshot.workloads.length + 1);
+    const hasWorkloads = snapshot.workloads.length > 0;
     rows.push(row(totalRow, [
       cell(`A${totalRow}`, 'TOTAL', { style: 2 }),
-      cell(`B${totalRow}`, '', { formula: `SUM(B${firstDataRow}:B${lastDataRow})`, style: 4 }),
-      cell(`C${totalRow}`, '', { formula: `SUMPRODUCT(B${firstDataRow}:B${lastDataRow},C${firstDataRow}:C${lastDataRow})`, style: 4 }),
-      cell(`D${totalRow}`, '', { formula: `SUMPRODUCT(B${firstDataRow}:B${lastDataRow},D${firstDataRow}:D${lastDataRow})`, style: 4 }),
-      cell(`G${totalRow}`, '', { formula: `SUM(G${firstDataRow}:G${lastDataRow})`, style: 4 }),
+      cell(`B${totalRow}`, '', { formula: hasWorkloads ? `SUM(B${firstDataRow}:B${lastDataRow})` : '0', style: 4 }),
+      cell(`C${totalRow}`, '', { formula: hasWorkloads ? `SUMPRODUCT(B${firstDataRow}:B${lastDataRow},C${firstDataRow}:C${lastDataRow})` : '0', style: 4 }),
+      cell(`D${totalRow}`, '', { formula: hasWorkloads ? `SUMPRODUCT(B${firstDataRow}:B${lastDataRow},D${firstDataRow}:D${lastDataRow})` : '0', style: 4 }),
+      cell(`G${totalRow}`, '', { formula: hasWorkloads ? `SUM(G${firstDataRow}:G${lastDataRow})` : '0', style: 4 }),
     ]));
 
     return {
@@ -1121,7 +1122,7 @@ thead th { color: var(--cp-text-muted); font-size: 11px; text-transform: upperca
 
   const engine = window.HyperVCapacity;
   const spreadsheet = window.HyperVSpreadsheet;
-  const unofficialDisclaimer = 'Alat ini tidak resmi dari Microsoft. Hasil adalah estimasi berbasis asumsi dan input pengguna. Bukan rekomendasi, validasi, atau persetujuan sizing dari Microsoft. Verifikasi sebelum keputusan produksi.';
+  const unofficialDisclaimer = 'This is not an official Microsoft tool. Results are estimates based on assumptions and user-provided inputs. They are not Microsoft recommendations, validation, or sizing approval. Validate before making production decisions.';
   const defaults = engine.DEFAULT_POLICY;
   const cluster = engine.DEFAULT_CLUSTER;
 
